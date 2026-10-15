@@ -108,18 +108,29 @@
 
 ## 5. 시스템 아키텍처
 
+앞 절의 사용자 여정을 시스템 연결로 펼치면 아래와 같습니다. 자격증 자료는 별도 수집 흐름으로 DB에 적재되고, 화면 조회와 추천은 백엔드가 저장 자료를 가져와 응답합니다. Calendar는 사용자가 권한을 동의한 뒤 별도 API 흐름으로 연결됩니다.
+
 ```mermaid
 flowchart LR
     U[사용자] --> F[React · TypeScript 화면]
-    F --> A[FastAPI]
-    A --> R[LangGraph 추천 에이전트]
-    R --> L[GPT-4o mini]
-    R --> D[(Render PostgreSQL)]
-    A --> D
-    Q[Q-Net · 공공데이터 수집] --> D
-    F --> O[Google Calendar 권한 동의]
-    O --> A
-    A --> G[Google Calendar API]
+    F -->|API 요청| A[FastAPI]
+    A -->|추천 요청| R[LangGraph 추천 에이전트]
+    R -->|모델 요청·응답| L[GPT-4o mini]
+    R -->|도구 선택| T[Python 조회 도구]
+    T -->|후보·근거 조회| D[(Render PostgreSQL)]
+    D -->|조회 결과| T
+    T -->|ToolMessage| R
+    A -->|상세·일정 조회| D
+    D -->|저장 정보| A
+    R -->|검증된 추천| A
+    A -->|JSON 응답| F
+    Q[Q-Net · 공공데이터] -->|별도 수집·정규화| C[자료 수집 작업]
+    C --> D
+    A -->|권한 동의 URL| F
+    F -->|OAuth 이동·동의| G[Google OAuth]
+    G -->|code · state| F
+    F -->|callback 요청| A
+    A -->|선택 일정 등록| GC[Google Calendar API]
 ```
 
 Q-Net·공공데이터 자료를 수집·정리해 PostgreSQL에 보관하고, 화면과 추천 에이전트는 이 저장 자료를 조회합니다. 추천 에이전트가 사용자의 화면 요청마다 Q-Net 외부 API를 직접 호출하는 방식은 아닙니다. Calendar 일정 생성은 추천 에이전트의 도구가 아니라 별도의 등록 API가 처리합니다.
@@ -137,6 +148,8 @@ Q-Net·공공데이터 자료를 수집·정리해 PostgreSQL에 보관하고, �
 
 ## 6. 기술 스택
 
+위 연결 흐름을 구현하는 기술은 화면, API·추천 처리, 데이터 저장, 외부 서비스로 나뉩니다.
+
 | 영역 | 기술·서비스 | 역할 |
 | --- | --- | --- |
 | 프론트엔드 | React 19, TypeScript 5, Vite 7 | 입력·검색·추천·상세·Calendar 등록 화면 |
@@ -146,6 +159,8 @@ Q-Net·공공데이터 자료를 수집·정리해 PostgreSQL에 보관하고, �
 | 외부 서비스 | Q-Net·공공데이터 API, Google Calendar API | 공식 자료 수집, 선택한 일정 등록 |
 
 ## 7. 데이터베이스 설계
+
+앞의 구성요소가 주고받는 자격증·시험·추천 근거·Calendar 등록 정보를 어떤 관계로 보관하는지 정리했습니다.
 
 | 데이터 묶음 | 주요 테이블 | 용도 |
 | --- | --- | --- |
@@ -354,14 +369,16 @@ public/assets/   # 앱에서 사용하는 이미지·아이콘·폰트
 
 ## 10. 팀 구성 및 역할
 
+앞의 사용자 흐름과 시스템을 기획·화면·API·데이터·추천 기능으로 나눠 협업했습니다. 팀별 담당 업무는 다음과 같습니다.
+
 | 이름 | 역할 | 담당 영역 | GitHub |
 | --- | --- | --- | --- |
-| 강민우 | FE 보조  | 와이어프레임 초안 수정 및 문서 점검  | [akfxkfkd135-collab](https://github.com/akfxkfkd135-collab) |
-| 박서윤 | 팀장, PM | 문서 정리 및 BE Agent/FE 기능 점검 | [seoyun-park](https://github.com/seoyun-park) |
-| 배소정 | FE, 배포 | 화면 구현, Git branch merge, Google Calendar API, DB/API 설계서 | [thwjd9393](https://github.com/thwjd9393) |
-| 임익현 | BE | FastAPI API, PostgreSQL 연동, LangGraph 기반 자격증 추천, Google Calendar 연동 및 통합 테스트 | [munchkin112](https://github.com/munchkin112) |
+| 박&#8288;서&#8288;윤 | 팀장, PM | 문서 정리 및 BE Agent/FE 기능 점검 | [seoyun-park](https://github.com/seoyun-park) |
+| 배&#8288;소&#8288;정 | FE, 배포 | 화면 구현, Git branch merge, Google Calendar API, DB/API 설계서 | [thwjd9393](https://github.com/thwjd9393) |
+| 임&#8288;익&#8288;현 | BE | FastAPI API, PostgreSQL 연동, LangGraph 기반 자격증 추천, Google Calendar 연동 및 통합 테스트 | [munchkin112](https://github.com/munchkin112) |
+| 강&#8288;민&#8288;우 | FE 보조 | 와이어프레임 초안 수정 및 문서 점검 | [akfxkfkd135-collab](https://github.com/akfxkfkd135-collab) |
 
-이 개인 레포에는 팀 작업 이후 보완한 관련 직무 표시, 개인 시연 화면, ERD와 실행 안내를 함께 정리했습니다.
+팀 프로젝트의 결과를 바탕으로 이 개인 레포에는 관련 직무 표시, 개인 시연 화면, ERD와 실행 안내를 보완해 정리했습니다.
 
 ---
 
